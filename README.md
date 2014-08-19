@@ -22,3 +22,7 @@ Alternatively, you can also add it to all your projects at once by adding it to 
 * Typing a key in the console while the notebook command is running does not fully stops the scala-notebook server. It seems to be stuck like described in [these](http://stackoverflow.com/questions/18748758/akka-application-cant-exit-the-application-after-shutting-down-actor-system) [SO](http://stackoverflow.com/questions/17669250/how-to-shut-down-the-dispatcher-thread-in-akka-actorsystem) questions, as the main function of the server has already exited. Some tuning of the config files or upgrading the akka version may solve this issue. As a temporary workaround, one can disable the forking of the server, by adding this line to `build.sbt`: `fork in Notebook := false`, but the other options (hostname, port, notebooks dir, notebooks project name will then be ignored).
 
 * Connection to the server is not encrypted. By default, this may not be a problem, as only one session to the server can be opened. If one disables this (adding the line `notebookSecure := false` to `build.sbt`) and opens a notebook on another machine, then this may be an issue.
+
+Copyright 2014 Alexandre Archambault, and others. See LICENSE file for more details.
+
+Released under Apache 2.0 license.
