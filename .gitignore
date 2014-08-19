@@ -1,0 +1,8 @@
+.idea/
+.idea_modules/
+.project
+.settings
+.classpath
+.akka-cookie
+target/
+logs/
