@@ -1,3 +1,4 @@
 Initial release:
+
 * Adds a `notebook` command to sbt JVM projects
 * Scala: only for 2.10
