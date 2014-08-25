@@ -8,7 +8,7 @@ organization := "com.github.alexarchambault"
 
 // licenses += ("Apache-2.0", url("http://opensource.org/licenses/Apache-2.0"))
 
-version := "0.1.0"
+version := "0.1.1-SNAPSHOT"
 
 sbtPlugin := true
 
