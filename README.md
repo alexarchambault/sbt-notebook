@@ -1,7 +1,7 @@
 sbt-notebook plugin
 ========
 
-A sbt plugin that adds [scala-notebook](https://github.com/Bridgewater/scala-notebook) capabilities to any sbt project.
+A sbt plugin that adds [scala-notebook](https://github.com/Bridgewater/scala-notebook) capabilities to any sbt (Scala 2.10 only for now) project.
 
 This plugin mainly adds a `notebook` task to your sbt project, that launches a scala-notebook server with your project build products and its dependencies on the classpath. You can think of it as a graphical in-browser `console`.
 
