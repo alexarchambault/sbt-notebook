@@ -68,11 +68,27 @@ object NotebookPlugin extends AutoPlugin {
       }
 
       updateTask
+    },
+    externalResolvers <<= (externalResolvers.task.?, resolvers, appResolvers) {
+      case (Some(delegated), Seq(), _) => delegated
+      case (_, rs, Some(ars))          => task { ars ++ rs } // TODO - Do we need to filter out duplicates?
+      case (_, rs, _)                  => task { Resolver.withDefaultResolvers(rs) }
+    },
+    fullResolvers <<= (projectResolver, externalResolvers, sbtPlugin, sbtResolver, bootResolvers, overrideBuildResolvers) map { (proj, rs, isPlugin, sbtr, boot, overrideFlag) =>
+      boot match {
+        case Some(repos) if overrideFlag => proj +: repos
+        case _ =>
+          val base = if (isPlugin) sbtr +: Classpaths.sbtPluginReleases +: rs else rs
+          proj +: base
+      }
     }
+  , ivyConfiguration <<= Classpaths.mkIvyConfiguration
+  , ivySbt <<= Classpaths.ivySbt0
   )
   
   override lazy val projectSettings = inConfig(Notebook)(scopedUpdateAndRunSettings ++ Seq(
-    libraryDependencies ++= Seq(
+    resolvers += "Sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
+  , libraryDependencies ++= Seq(
       "com.github.alexarchambault.scala_notebook" %% "server" % "0.3.0-SNAPSHOT"
     )
   , fork := true // Forking so that the config options (in javaOptions, below) are given to scala-notebook
