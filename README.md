@@ -7,7 +7,7 @@ This plugin mainly adds a `notebook` task to your sbt project, that launches a s
 
 ### Setup
 
-1. Add the following lines to `project/plugins.sbt`:
+* Add the following lines to `project/plugins.sbt`:
 ```scala
 addSbtPlugin("com.github.alexarchambault" %% "sbt-notebook" % "0.1.0")
 ```
@@ -19,13 +19,13 @@ addSbtPlugin("com.github.alexarchambault" %% "sbt-notebook" % "0.1.1-SNAPSHOT")
 ```
 Alternatively, you can also add them to all your projects at once by adding them to `~/.sbt/0.13/plugins/build.sbt`.
 
-2. That's it! Type `notebook` at the sbt prompt, and a browser window should open at the right address. This address will also be printed on the command-line.
+* That's it! Type `notebook` at the sbt prompt, and a browser window should open at the right address. This address will also be printed on the command-line.
 
 ### Known issues
 
-* Only works for scala 2.10 projects for now.
+* Does not work with scala versions other than 2.10.
 
-* Typing a key in the console while the notebook command is running does not fully stops the scala-notebook server as it should be.
+* Typing a key in the console while the notebook command is running does not fully stop the scala-notebook server as it should.
 It seems to be stuck like described in these [SO](http://stackoverflow.com/questions/18748758/akka-application-cant-exit-the-application-after-shutting-down-actor-system) [questions](http://stackoverflow.com/questions/17669250/how-to-shut-down-the-dispatcher-thread-in-akka-actorsystem), as the main function of the server has already exited. Some tuning of the config files or upgrading the akka version may solve this issue. As a temporary workaround, one can disable the forking of the server, by adding this line to `build.sbt`: `fork in Notebook := false`, but the other options (hostname, port, notebooks dir, notebooks project name will then be ignored).
 
 * Connection to the server is not encrypted. By default, this may not be a problem, as only one session to the server can be opened. If one disables this (adding the line `notebookSecure := false` to `build.sbt`) and opens a notebook on another machine, then this may be an issue.
