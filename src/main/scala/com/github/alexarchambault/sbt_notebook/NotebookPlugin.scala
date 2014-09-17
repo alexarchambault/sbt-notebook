@@ -5,7 +5,7 @@ import sbt._, sbt.Keys._
 
 object NotebookPlugin extends AutoPlugin {
 
-  lazy val Notebook = config("notebook") extend Runtime
+  lazy val Notebook = config("notebook") extend (Compile, Runtime)
 
 
   object autoImport {
@@ -23,89 +23,48 @@ object NotebookPlugin extends AutoPlugin {
 
   override def trigger = allRequirements
   
-  private lazy val scopedUpdateAndRunSettings = Defaults.compileSettings ++ Defaults.runnerSettings ++ Seq(
-    allDependencies := {
-      projectDependencies.value ++ libraryDependencies.value
-    }
-  , moduleSettings <<= {
-      Def.task {
-        new InlineConfiguration(projectID.value, projectInfo.value, allDependencies.value, dependencyOverrides.value, ivyXML.value, ivyConfigurations.value, defaultConfiguration.value, ivyScala.value, ivyValidate.value, conflictManager.value)
-      }
-    }
-  , ivyModule := { val is = ivySbt.value; new is.Module(moduleSettings.value) }
-  , run <<= Defaults.runTask(fullClasspath, mainClass in run, runner in run)
-  , runMain <<= Defaults.runMainTask(fullClasspath, runner in run)
-  , update <<= {
-      import sbt.CrossVersion._
-      import sbt.Def.Initialize
-
-      def unmanagedScalaInstanceOnly: Initialize[Task[Option[ScalaInstance]]] = Def.taskDyn {
-        if(scalaHome.value.isDefined) Def.task(Some(scalaInstance.value)) else Def.task(None)
-      }
-      def updateTask: Initialize[Task[UpdateReport]] = Def.task {
-        val depsUpdated = transitiveUpdate.value.exists(!_.stats.cached)
-        val isRoot = executionRoots.value contains resolvedScoped.value
-        val s = streams.value
-        val scalaProvider = appConfiguration.value.provider.scalaProvider
-
-        // Only substitute unmanaged jars for managed jars when the major.minor parts of the versions the same for:
-        //   the resolved Scala version and the scalaHome version: compatible (weakly- no qualifier checked)
-        //   the resolved Scala version and the declared scalaVersion: assume the user intended scalaHome to override anything with scalaVersion
-        def subUnmanaged(subVersion: String, jars: Seq[File])  =  (sv: String) =>
-          (partialVersion(sv), partialVersion(subVersion), partialVersion(scalaVersion.value)) match {
-            case (Some(res), Some(sh), _) if res == sh => jars
-            case (Some(res), _, Some(decl)) if res == decl => jars
-            case _ => Nil
-          }
-        val subScalaJars: String => Seq[File] = unmanagedScalaInstanceOnly.value match {
-          case Some(si) => subUnmanaged(si.version, si.jars)
-          case None => sv => if(scalaProvider.version == sv) scalaProvider.jars else Nil
-        }
-        val transform: UpdateReport => UpdateReport = r => Classpaths.substituteScalaFiles(scalaOrganization.value, r)(subScalaJars)
-
-        val show = Reference.display(thisProjectRef.value)
-        Classpaths.cachedUpdate(s.cacheDirectory, show, (ivyModule in Notebook).value, updateConfiguration.value, transform, skip = (skip in update).value, force = isRoot, depsUpdated = depsUpdated, log = s.log)
-      }
-
-      updateTask
-    },
-    externalResolvers <<= (externalResolvers.task.?, resolvers, appResolvers) {
-      case (Some(delegated), Seq(), _) => delegated
-      case (_, rs, Some(ars))          => task { ars ++ rs } // TODO - Do we need to filter out duplicates?
-      case (_, rs, _)                  => task { Resolver.withDefaultResolvers(rs) }
-    },
-    fullResolvers <<= (projectResolver, externalResolvers, sbtPlugin, sbtResolver, bootResolvers, overrideBuildResolvers) map { (proj, rs, isPlugin, sbtr, boot, overrideFlag) =>
-      boot match {
-        case Some(repos) if overrideFlag => proj +: repos
-        case _ =>
-          val base = if (isPlugin) sbtr +: Classpaths.sbtPluginReleases +: rs else rs
-          proj +: base
-      }
-    }
-  , ivyConfiguration <<= Classpaths.mkIvyConfiguration
-  , ivySbt <<= Classpaths.ivySbt0
-  )
-  
-  override lazy val projectSettings = inConfig(Notebook)(scopedUpdateAndRunSettings ++ Seq(
-    resolvers += "Sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
-  , libraryDependencies ++= Seq(
-      "com.github.alexarchambault.scala_notebook" %% "server" % "0.3.0-SNAPSHOT"
+  override lazy val projectSettings = inConfig(Notebook)(
+    Defaults.compileSettings ++ Defaults.runnerSettings ++ Classpaths.ivyBaseSettings ++ 
+    Seq(
+      /* Overriding run and runMain defined by compileSettings so that they use the scoped fullClasspath 
+       * - why don't they by default? */
+      run <<= Defaults.runTask(fullClasspath, mainClass in run, runner in run)
+    , runMain <<= Defaults.runMainTask(fullClasspath, runner in run)
+      /* Overriding classDirectory defined by compileSettings so that we are given
+        the classDirectory of the default scope in runMain below */     
+    , classDirectory := crossTarget.value / "classes"
+      /* Adding scala-notebook dependency */
+    , resolvers += Resolver.sonatypeRepo("snapshots")
+    , libraryDependencies ++= Seq(
+        "com.github.alexarchambault.scala_notebook" %% "server" % "0.3.0-SNAPSHOT"
+      )
+      /* Forking so that the config options (in javaOptions, below) are given to scala-notebook */
+    , fork := true
+      /* Connecting input, so that the scala-notebook server is given the input events, although
+         the goal of it - exiting on key press - is still buggy */
+    , connectInput := true
     )
-  , fork := true // Forking so that the config options (in javaOptions, below) are given to scala-notebook
-  , connectInput := true
-  )) ++ Seq(
-    notebookHost := "127.0.0.1"
-  , notebookPort := 8999
-  , notebookSecure := true
-  , notebooksDirectory := baseDirectory.value / "notebooks"
+  ) ++ Seq(
+    /* Default config values */
+    notebookHost        := "127.0.0.1"
+  , notebookPort        := 8999
+  , notebookSecure      := true
+  , notebooksDirectory  := baseDirectory.value / "notebooks"
   , notebookProjectName := name.value
+    /* Giving the config values to scala-notebook as command-line config options */
   , javaOptions ++= Seq(
       "notebook.hostname"        -> notebookHost.value
     , "notebook.port"            -> notebookPort.value.toString
     , "notebook.notebooks.name"  -> notebookProjectName.value
     , "notebook.notebooks.dir"   -> notebooksDirectory.value.getAbsolutePath
     ).map{case (arg, value) => s"-D$arg=$value"}
+    /* Definition of the notebook command/task */
   , notebook <<= Def.taskDyn {
+      /* Compiling the root project, so that its build products and those of its dependency sub-projects are available
+         in the classpath */
+      (compile in Runtime).value
+      
+      /* Launching the scala-notebook server */
       (runMain in Notebook).toTask(" com.bwater.notebook.Server" + (if (notebookSecure.value) "" else " --disable_security"))
     }
   )
