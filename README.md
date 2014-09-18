@@ -25,7 +25,7 @@ Alternatively, you can also add them to all your projects at once by adding them
 
 * Does not work with scala versions other than 2.10.
 
-* scala-notebook relies on akka 2.1.4. It seems not to work with akka >= 2.2.0. See (this)[https://github.com/Bridgewater/scala-notebook/issues/46] and (this project)[https://github.com/andypetrella/scala-notebook/tree/spark].
+* scala-notebook relies on akka 2.1.4. It seems not to work with akka >= 2.2.0. See [this](https://github.com/Bridgewater/scala-notebook/issues/46) and [this project](https://github.com/andypetrella/scala-notebook/tree/spark).
 
 * Typing a key in the console while the notebook command is running does not fully stop the scala-notebook server as it should.
 It seems to be stuck like described in these [SO](http://stackoverflow.com/questions/18748758/akka-application-cant-exit-the-application-after-shutting-down-actor-system) [questions](http://stackoverflow.com/questions/17669250/how-to-shut-down-the-dispatcher-thread-in-akka-actorsystem), as the main function of the server has already exited. Some tuning of the config files or upgrading the akka version may solve this issue. As a temporary workaround, one can disable the forking of the server, by adding this line to `build.sbt`: `fork in Notebook := false`, but the other options (hostname, port, notebooks dir, notebooks project name will then be ignored).
