@@ -32,6 +32,6 @@ It seems to be stuck like described in these [SO](http://stackoverflow.com/quest
 
 * Connection to the server is not encrypted. By default, this may not be a problem, as only one session to the server can be opened. If one disables this (adding the line `notebookSecure := false` to `build.sbt`) and opens a notebook on another machine, then this may be an issue.
 
-Copyright (c) 2014 Alexandre Archambault, and others. See LICENSE file for more details.
+Copyright (c) 2014 Alexandre Archambault. See LICENSE file for more details.
 
 Released under Apache 2.0 license.
