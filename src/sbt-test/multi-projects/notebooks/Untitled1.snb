@@ -1,0 +1,32 @@
+{
+  "metadata":{
+    "name":"Untitled1",
+    "user_save_timestamp":"2014-08-19T20:20:54.786Z",
+    "auto_save_timestamp":"1970-01-01T00:00:00.000Z"
+  },
+  "worksheets":[{
+    "cells":[{
+      "cell_type":"code",
+      "input":"A.msg",
+      "language":"scala",
+      "collapsed":false,
+      "prompt_number":2,
+      "outputs":[]
+    },{
+      "cell_type":"code",
+      "input":"B.msg",
+      "language":"scala",
+      "collapsed":false,
+      "prompt_number":3,
+      "outputs":[]
+    },{
+      "cell_type":"code",
+      "input":"",
+      "language":"scala",
+      "collapsed":true,
+      "outputs":[]
+    }]
+  }],
+  "autosaved":[],
+  "nbformat":3
+}
