@@ -1,0 +1,4 @@
+v0.1.1:
+
+* Cleaner project settings, test projects
+* Fix: build products of the root project were not included in the classpath (sub-projects still ok)
