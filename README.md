@@ -23,6 +23,9 @@ Alternatively, you can also add them to all your projects at once by adding them
 
 ### Known issues
 
+* Requires sbt >= 0.13.5. Add `sbt.version=0.13.5` (or `0.13.7`) to `project/build.properties` of
+the projects you want the `notebook` command to be available for.
+
 * Does not work with scala versions other than 2.10.
 
 * scala-notebook relies on akka 2.1.4. It seems not to work with akka >= 2.2.0. See [this](https://github.com/Bridgewater/scala-notebook/issues/46) and [this project](https://github.com/andypetrella/scala-notebook/tree/spark).
