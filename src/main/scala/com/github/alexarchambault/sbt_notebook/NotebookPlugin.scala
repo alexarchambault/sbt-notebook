@@ -38,7 +38,7 @@ object NotebookPlugin extends AutoPlugin {
       resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies ++= Seq(
         // TODO Add scala or spark kernel, in shared mode (shared CP)
-        "com.github.alexarchambault.jove" %% "jove-embedded" % "0.1.0-SNAPSHOT"
+        "sh.jove" %% "jove-embedded" % "0.1.0-SNAPSHOT"
       ),
       /* Connecting input, to interrupt on key press */
       connectInput := true
