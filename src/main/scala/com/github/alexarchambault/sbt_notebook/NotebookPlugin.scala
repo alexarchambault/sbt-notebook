@@ -73,7 +73,7 @@ object NotebookPlugin extends AutoPlugin {
       if (notebookSharedVariables.value)
         extraOpts = "--shared" :: extraOpts
 
-      (runMain in Notebook).toTask(s" jove.embedded.EmbeddedKernel --exit-on-key-press --notebook-server ${extraOpts mkString " "}")
+      (runMain in Notebook).toTask(s" jove.scala.JoveScalaEmbedded --exit-on-key-press --notebook-server ${extraOpts mkString " "}")
     }
   )
 
