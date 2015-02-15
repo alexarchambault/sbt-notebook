@@ -1,6 +1,5 @@
 package com.github.alexarchambault.sbt_notebook
 
-import java.io.File
 import sbt._, sbt.Keys._
 
 object NotebookPlugin extends AutoPlugin {
@@ -9,16 +8,10 @@ object NotebookPlugin extends AutoPlugin {
 
 
   object autoImport {
-    val notebookHost = taskKey[String]("Host of the notebook server")
-    val notebookPort = taskKey[Int]("Port of the notebook server")
-
-    val notebooksDirectory = taskKey[File]("Directory the notebooks")
-    val notebookKernelName = taskKey[String]("Notebooks project name")
-
-    val notebookSharedVariables = taskKey[Boolean]("Whether the notebook sessions should share their variables")
-
-    val notebookKernel = taskKey[Unit]("Run a notebook kernel")
-    val notebook = taskKey[Unit]("Run notebook kernel and server")
+    val nbSparkVersion = settingKey[Option[String]]("Spark version for the notebook kernel")
+    val nbKernelName = taskKey[String]("Project notebook kernel name")
+    val nbIPythonMode = settingKey[Boolean]("Run the notebook kernel in single-threaded IPython mode")
+    val nbKernel = taskKey[Unit]("Run a notebook kernel")
   }
   
   import autoImport._
@@ -36,44 +29,43 @@ object NotebookPlugin extends AutoPlugin {
       classDirectory := crossTarget.value / "classes",
       /* Adding jove-embedded dependency */
       resolvers += Resolver.sonatypeRepo("snapshots"),
-      libraryDependencies ++= Seq(
-        // TODO Add scala or spark kernel, in shared mode (shared CP)
-        "sh.jove" %% "jove-embedded" % "0.1.0-SNAPSHOT"
-      ),
+      libraryDependencies += {
+        (nbSparkVersion in Runtime).value match {
+          case Some(sv) =>
+            val binaryVersion = sv split '.' take 2 mkString "."
+            "sh.jove" %% s"jove-spark-embedded-cli_$binaryVersion" % "0.1.0-SNAPSHOT"
+          case None =>
+            "sh.jove" %% "jove-scala-embedded-cli" % "0.1.0-SNAPSHOT"
+        }
+      },
       /* Connecting input, to interrupt on key press */
       connectInput := true
     )
   ) ++ Seq(
+    nbSparkVersion := {
+      libraryDependencies.value
+        .find(m => m.organization == "org.apache.spark" && m.name.startsWith("spark-core"))
+        .map(_.revision)
+    },
     /* Default config values */
-    notebookHost        := "",
-    notebookPort        := 9000,
-    notebooksDirectory  := baseDirectory.value / "notebooks",
-    notebookKernelName := name.value,
+    nbKernelName := name.value,
+    nbIPythonMode := false,
     /* Definitions of the notebook commands/tasks */
-    notebookKernel <<= Def.taskDyn {
+    nbKernel <<= Def.taskDyn {
       /* Compiling the root project, so that its build products and those of its dependency sub-projects are available
          in the classpath */
       (compile in Runtime).value
 
-      var extraOpts = List.empty[String]
+      var extraOpts = List("--exit-on-key-press")
 
-      if (notebookSharedVariables.value)
-        extraOpts = "--shared" :: extraOpts
-      
+      if (!nbIPythonMode.value)
+        extraOpts ::= "--meta"
+
+      val mainClass =
+        (nbSparkVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
+
       /* Launching the notebook kernel */
-      (runMain in Notebook).toTask(s" jove.embedded.EmbeddedKernel --exit-on-key-press ${extraOpts mkString " "}")
-    },
-    notebook <<= Def.taskDyn {
-      // TODO Pass the notebook options (host, port, ...) to the notebook server
-      // FIXME Factorize with above (only difference is the --notebook-server option here)
-      (compile in Runtime).value
-
-      var extraOpts = List.empty[String]
-
-      if (notebookSharedVariables.value)
-        extraOpts = "--shared" :: extraOpts
-
-      (runMain in Notebook).toTask(s" jove.scala.JoveScalaEmbedded --exit-on-key-press --notebook-server ${extraOpts mkString " "}")
+      (runMain in Notebook).toTask(s" $mainClass ${extraOpts mkString " "}")
     }
   )
 
