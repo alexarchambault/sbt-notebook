@@ -47,7 +47,8 @@ class SbtNotebookBuild(
           case _ =>
             Credentials(Path.userHome / ".ivy2" / ".credentials")
         }
-      }
+      },
+      scalacOptions += "-target:jvm-1.7"
     )
     .settings(xerial.sbt.Sonatype.sonatypeSettings: _*)
 
