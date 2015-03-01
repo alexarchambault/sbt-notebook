@@ -1,4 +1,6 @@
 import sbt._, Keys._
+import sbtrelease.ReleasePlugin._
+import com.typesafe.sbt.pgp.PgpKeys
 
 class SbtNotebookBuild(
   base: File
@@ -8,7 +10,6 @@ class SbtNotebookBuild(
     .settings(
       name := "sbt-notebook",
       organization := "com.github.alexarchambault",
-      version := "0.2.0-SNAPSHOT",
       sbtPlugin := true,
       scalaVersion := "2.10.4",
       publishMavenStyle := true,
@@ -48,7 +49,9 @@ class SbtNotebookBuild(
             Credentials(Path.userHome / ".ivy2" / ".credentials")
         }
       },
-      scalacOptions += "-target:jvm-1.7"
+      scalacOptions += "-target:jvm-1.7",
+      ReleaseKeys.versionBump := sbtrelease.Version.Bump.Bugfix,
+      ReleaseKeys.publishArtifactsAction := PgpKeys.publishSigned.value
     )
     .settings(xerial.sbt.Sonatype.sonatypeSettings: _*)
 
