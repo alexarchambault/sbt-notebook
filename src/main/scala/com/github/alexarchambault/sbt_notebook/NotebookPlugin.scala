@@ -51,7 +51,8 @@ object NotebookPlugin extends AutoPlugin {
         }
       },
       /* Connecting input, to interrupt on key press */
-      connectInput := true
+      connectInput := true,
+      fork := true
     )
   ) ++ Seq(
     /* Default config values */
@@ -66,7 +67,7 @@ object NotebookPlugin extends AutoPlugin {
     jupyterJoveMetaPath := {
       val setUpFile = (homeDir /: List(".ipython", ".jove-meta-path"))(_ / _)
       if (!setUpFile.exists())
-        throw new Exception(s"jove-meta set-up file (${setUpFile.getAbsolutePath}) not found, run jove-meta --setup must be run once")
+        throw new Exception(s"jove-meta set-up file (${setUpFile.getAbsolutePath}) not found, jove-meta --setup must be run once")
 
       val path = IO.read(setUpFile)
       val joveMetaFile = file(path)
@@ -78,6 +79,7 @@ object NotebookPlugin extends AutoPlugin {
     jupyterJoveMetaConnectionFile := {
       file(Option(System.getProperty("java.io.tmpdir")) getOrElse "/tmp") / s"jove-meta-${jupyterKernelId.value}-${UUID.randomUUID()}.json"
     },
+    jupyterKernelSpecSetupForce := false,
     jupyterKernelSpecSetup := {
       val dir = homeDir / ".ipython" / "kernels" / jupyterKernelId.value
       val ackFile = dir / ".sbt-jupyter"
@@ -94,7 +96,7 @@ object NotebookPlugin extends AutoPlugin {
 
       IO.write(kernelFile,
         s"""{
-           |  "argv": ${Seq(jupyterJoveMetaPath, "--id", jupyterKernelId.value, "--quiet", "--meta-connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath, "--connection-file", "{connection_file}").map("\"" + _ + "\"").mkString("[", ", ", "]")},
+           |  "argv": ${Seq(jupyterJoveMetaPath.value, "--id", jupyterKernelId.value, "--quiet", "--meta-connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath, "--connection-file", "{connection_file}").map("\"" + _ + "\"").mkString("[", ", ", "]")},
            |  "display_name": "${jupyterKernelName.value}",
            |  "language": "scala",
            |  "extensions": ["snb"]
@@ -110,10 +112,16 @@ object NotebookPlugin extends AutoPlugin {
          in the classpath */
       (compile in Runtime).value
 
-      val extraOpts = List("--exit-on-key-press", "--meta", "--connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath)
+      val extraOpts = List("--exit-on-key-press", "--quiet", "--meta", "--id", jupyterKernelId.value, "--connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath)
 
       val mainClass =
         (jupyterKernelSparkVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
+
+      val (_, hook) = jupyterKernelSpecSetup.value
+
+      java.lang.Runtime.getRuntime addShutdownHook new Thread {
+        override def run() = hook()
+      }
 
       /* Launching the notebook kernel */
       (runMain in Notebook).toTask(s" $mainClass ${extraOpts mkString " "}")
