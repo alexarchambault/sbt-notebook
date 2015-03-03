@@ -5,6 +5,9 @@ A sbt plugin that adds [scala-notebook](https://github.com/Bridgewater/scala-not
 
 This plugin mainly adds a `notebook` task to your sbt project, that launches a scala-notebook server with your project build products and its dependencies on the classpath. You can think of it as a graphical in-browser `console`.
 
+[![Build Status](https://travis-ci.org/alexarchambault/sbt-notebook.svg?branch=master)](https://travis-ci.org/alexarchambault/sbt-notebook)
+[![Join the chat at https://gitter.im/jove-sh/jove-notebook](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/jove-sh/jove-notebook?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ### Setup
 
 * Add the following line to `project/plugins.sbt`:
