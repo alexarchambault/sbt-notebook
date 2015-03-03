@@ -7,17 +7,11 @@ This plugin mainly adds a `notebook` task to your sbt project, that launches a s
 
 ### Setup
 
-* Add the following lines to `project/plugins.sbt`:
+* Add the following line to `project/plugins.sbt`:
 ```scala
 addSbtPlugin("com.github.alexarchambault" %% "sbt-notebook" % "0.1.1")
 ```
- For the development version:
-```scala
-resolvers += Resolver.sonatypeRepo("snapshots")
-
-addSbtPlugin("com.github.alexarchambault" %% "sbt-notebook" % "0.1.2-SNAPSHOT")
-```
-Alternatively, you can also add them to all your projects at once by adding them to `~/.sbt/0.13/plugins/build.sbt`.
+Alternatively, you can also add it to all your projects at once by adding it to `~/.sbt/0.13/plugins/build.sbt`.
 
 * That's it! Type `notebook` at the sbt prompt, and a browser window should open at the right address. This address will also be printed in the console.
 
