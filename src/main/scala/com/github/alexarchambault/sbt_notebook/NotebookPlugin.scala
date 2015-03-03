@@ -1,24 +1,29 @@
 package com.github.alexarchambault.sbt_notebook
 
-import java.io.File
+import java.util.UUID
+
 import sbt._, sbt.Keys._
 
 object NotebookPlugin extends AutoPlugin {
 
   lazy val Notebook = config("notebook") extend (Compile, Runtime)
 
-
   object autoImport {
-    val notebookHost = taskKey[String]("Host of the scala-notebook server")
-    val notebookPort = taskKey[Int]("Port of the scala-notebook server")
-    val notebookSecure = taskKey[Boolean]("Secure notebook server (should? allow only one connection)")
-
-    val notebooksDirectory = taskKey[File]("Directory the notebooks")
-    val notebookProjectName = taskKey[String]("Notebooks project name")
-    
-    val notebook = taskKey[Unit]("Run the scala-notebook server")
+    val jupyterSparkBinaryVersion = settingKey[Option[String]]("Spark binary version for the Jupyter kernel")
+    val jupyterJoveVersion = settingKey[Option[String]]("Jove version for the Jupyter kernel")
+    val jupyterKernelId = taskKey[String]("Jupyter kernel id")
+    val jupyterKernelName = taskKey[String]("Jupyter kernel name")
+    val jupyter = taskKey[Unit]("Run a Jupyter kernel")
+    val jupyterJoveMetaPath = taskKey[String]("jove-meta path")
+    val jupyterJoveMetaConnectionFile = taskKey[File]("jove-meta connection file")
+    val jupyterKernelSpecSetupForce = settingKey[Boolean]("Force Jupyter kernel spec set up")
+    val jupyterKernelSpecSetup = taskKey[(File, () => Unit)]("Set up Jupyter kernel spec")
   }
-  
+
+  private def homeDir = Option(System getProperty "user.home").filterNot(_.isEmpty).orElse(sys.env.get("HOME").filterNot(_.isEmpty)).map(file) getOrElse {
+    throw new Exception("Cannot get user home dir, set one in the HOME environment variable")
+  }
+
   import autoImport._
 
   override def trigger = allRequirements
@@ -26,46 +31,99 @@ object NotebookPlugin extends AutoPlugin {
   override lazy val projectSettings = inConfig(Notebook)(
     Defaults.compileSettings ++ Defaults.runnerSettings ++ Classpaths.ivyBaseSettings ++ 
     Seq(
-      /* Overriding run and runMain defined by compileSettings so that they use the scoped fullClasspath 
-       * - why don't they by default? */
-      run <<= Defaults.runTask(fullClasspath, mainClass in run, runner in run)
-    , runMain <<= Defaults.runMainTask(fullClasspath, runner in run)
+      /* Overriding run and runMain defined by compileSettings so that they use the scoped fullClasspath */
+      run <<= Defaults.runTask(fullClasspath, mainClass in run, runner in run),
+      runMain <<= Defaults.runMainTask(fullClasspath, runner in run),
       /* Overriding classDirectory defined by compileSettings so that we are given
         the classDirectory of the default scope in runMain below */     
-    , classDirectory := crossTarget.value / "classes"
-      /* Adding scala-notebook dependency */
-    , resolvers += Resolver.sonatypeRepo("snapshots")
-    , libraryDependencies ++= Seq(
-        "com.github.alexarchambault.scala_notebook" %% "server" % "0.3.0-SNAPSHOT"
-      )
-      /* Forking so that the config options (in javaOptions, below) are given to scala-notebook */
-    , fork := true
-      /* Connecting input, so that the scala-notebook server is given the input events, although
-         the goal of it - exiting on key press - is still buggy */
-    , connectInput := true
+      classDirectory := crossTarget.value / "classes",
+      /* Adding jove-embedded dependency */
+      resolvers += Resolver.sonatypeRepo("snapshots"),
+      libraryDependencies += {
+        val joveVersion = jupyterJoveVersion.value getOrElse "0.1.1-1-SNAPSHOT"
+
+        (jupyterSparkBinaryVersion in Runtime).value match {
+          case Some(binaryVersion) =>
+            "sh.jove" %% s"jove-spark-embedded-cli_$binaryVersion" % joveVersion
+          case None =>
+            "sh.jove" %% "jove-scala-embedded-cli" % joveVersion
+        }
+      },
+      /* Connecting input, to interrupt on key press */
+      connectInput := true,
+      fork := true
     )
   ) ++ Seq(
     /* Default config values */
-    notebookHost        := "127.0.0.1"
-  , notebookPort        := 8999
-  , notebookSecure      := true
-  , notebooksDirectory  := baseDirectory.value / "notebooks"
-  , notebookProjectName := name.value
-    /* Giving the config values to scala-notebook as command-line config options */
-  , javaOptions ++= Seq(
-      "notebook.hostname"        -> notebookHost.value
-    , "notebook.port"            -> notebookPort.value.toString
-    , "notebook.notebooks.name"  -> notebookProjectName.value
-    , "notebook.notebooks.dir"   -> notebooksDirectory.value.getAbsolutePath
-    ).map{case (arg, value) => s"-D$arg=$value"}
-    /* Definition of the notebook command/task */
-  , notebook <<= Def.taskDyn {
+    jupyterSparkBinaryVersion := {
+      libraryDependencies.value
+        .find(m => m.organization == "org.apache.spark" && m.name.startsWith("spark-core"))
+        .map(_.revision split '.' take 2 mkString ".")
+    },
+    jupyterJoveVersion := None,
+    jupyterKernelId := moduleName.value,
+    jupyterKernelName := name.value,
+    jupyterJoveMetaPath := {
+      val setUpFile = (homeDir /: List(".ipython", ".jove-meta-path"))(_ / _)
+      if (!setUpFile.exists())
+        throw new Exception(s"jove-meta set-up file (${setUpFile.getAbsolutePath}) not found, jove-meta --setup must be run once")
+
+      val path = IO.read(setUpFile)
+      val joveMetaFile = file(path)
+      if (!joveMetaFile.exists())
+        scala.Console.err println s"Warning: jove-meta not found at path $path (from setup file ${setUpFile.getAbsolutePath})"
+
+      path
+    },
+    jupyterJoveMetaConnectionFile := {
+      file(Option(System.getProperty("java.io.tmpdir")) getOrElse "/tmp") / s"jove-meta-${jupyterKernelId.value}-${UUID.randomUUID()}.json"
+    },
+    jupyterKernelSpecSetupForce := false,
+    jupyterKernelSpecSetup := {
+      val dir = homeDir / ".ipython" / "kernels" / jupyterKernelId.value
+      val ackFile = dir / ".sbt-jupyter"
+      val kernelFile = dir / "kernel.json"
+
+      if (dir.exists() && !ackFile.exists() && !jupyterKernelSpecSetupForce.value)
+        throw new Exception(s"${dir.getAbsolutePath} already exists, force erasing it with  jupyterKernelSpecSetupForce := true")
+
+      if (!dir.exists() && !dir.mkdirs())
+        scala.Console.err println s"Warning: failed at creating ${dir.getAbsolutePath}, trying to generate setup anyway"
+
+      if (!ackFile.exists())
+        IO.write(ackFile, Array.empty[Byte])
+
+      IO.write(kernelFile,
+        s"""{
+           |  "argv": ${Seq(jupyterJoveMetaPath.value, "--id", jupyterKernelId.value, "--quiet", "--meta-connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath, "--connection-file", "{connection_file}").map("\"" + _ + "\"").mkString("[", ", ", "]")},
+           |  "display_name": "${jupyterKernelName.value}",
+           |  "language": "scala",
+           |  "extensions": ["snb"]
+           |}
+         """.stripMargin
+      )
+
+      (kernelFile, { () => IO.delete(dir) })
+    },
+    /* Definitions of the notebook commands/tasks */
+    jupyter <<= Def.taskDyn {
       /* Compiling the root project, so that its build products and those of its dependency sub-projects are available
          in the classpath */
       (compile in Runtime).value
-      
-      /* Launching the scala-notebook server */
-      (runMain in Notebook).toTask(" com.bwater.notebook.Server" + (if (notebookSecure.value) "" else " --disable_security"))
+
+      val extraOpts = List("--exit-on-key-press", "--quiet", "--meta", "--id", jupyterKernelId.value, "--connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath)
+
+      val mainClass =
+        (jupyterSparkBinaryVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
+
+      val (_, hook) = jupyterKernelSpecSetup.value
+
+      java.lang.Runtime.getRuntime addShutdownHook new Thread {
+        override def run() = hook()
+      }
+
+      /* Launching the notebook kernel */
+      (runMain in Notebook).toTask(s" $mainClass ${extraOpts mkString " "}")
     }
   )
 
