@@ -9,11 +9,11 @@ object NotebookPlugin extends AutoPlugin {
   lazy val Notebook = config("notebook") extend (Compile, Runtime)
 
   object autoImport {
-    val jupyterKernelSparkVersion = settingKey[Option[String]]("Spark version for the Jupyter kernel")
-    val jupyterKernelJoveVersion = settingKey[Option[String]]("Jove version for the Jupyter kernel")
+    val jupyterSparkVersion = settingKey[Option[String]]("Spark version for the Jupyter kernel")
+    val jupyterJoveVersion = settingKey[Option[String]]("Jove version for the Jupyter kernel")
     val jupyterKernelId = taskKey[String]("Jupyter kernel id")
     val jupyterKernelName = taskKey[String]("Jupyter kernel name")
-    val jupyterKernel = taskKey[Unit]("Run a Jupyter kernel")
+    val jupyter = taskKey[Unit]("Run a Jupyter kernel")
     val jupyterJoveMetaPath = taskKey[String]("jove-meta path")
     val jupyterJoveMetaConnectionFile = taskKey[File]("jove-meta connection file")
     val jupyterKernelSpecSetupForce = settingKey[Boolean]("Force Jupyter kernel spec set up")
@@ -40,9 +40,9 @@ object NotebookPlugin extends AutoPlugin {
       /* Adding jove-embedded dependency */
       resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies += {
-        val joveVersion = jupyterKernelJoveVersion.value getOrElse "0.1.1-1-SNAPSHOT"
+        val joveVersion = jupyterJoveVersion.value getOrElse "0.1.1-1-SNAPSHOT"
 
-        (jupyterKernelSparkVersion in Runtime).value match {
+        (jupyterSparkVersion in Runtime).value match {
           case Some(sv) =>
             val binaryVersion = sv split '.' take 2 mkString "."
             "sh.jove" %% s"jove-spark-embedded-cli_$binaryVersion" % joveVersion
@@ -56,12 +56,12 @@ object NotebookPlugin extends AutoPlugin {
     )
   ) ++ Seq(
     /* Default config values */
-    jupyterKernelSparkVersion := {
+    jupyterSparkVersion := {
       libraryDependencies.value
         .find(m => m.organization == "org.apache.spark" && m.name.startsWith("spark-core"))
         .map(_.revision)
     },
-    jupyterKernelJoveVersion := None,
+    jupyterJoveVersion := None,
     jupyterKernelId := moduleName.value,
     jupyterKernelName := name.value,
     jupyterJoveMetaPath := {
@@ -107,7 +107,7 @@ object NotebookPlugin extends AutoPlugin {
       (kernelFile, { () => IO.delete(dir) })
     },
     /* Definitions of the notebook commands/tasks */
-    jupyterKernel <<= Def.taskDyn {
+    jupyter <<= Def.taskDyn {
       /* Compiling the root project, so that its build products and those of its dependency sub-projects are available
          in the classpath */
       (compile in Runtime).value
@@ -115,7 +115,7 @@ object NotebookPlugin extends AutoPlugin {
       val extraOpts = List("--exit-on-key-press", "--quiet", "--meta", "--id", jupyterKernelId.value, "--connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath)
 
       val mainClass =
-        (jupyterKernelSparkVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
+        (jupyterSparkVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
 
       val (_, hook) = jupyterKernelSpecSetup.value
 
