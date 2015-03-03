@@ -9,7 +9,7 @@ object NotebookPlugin extends AutoPlugin {
   lazy val Notebook = config("notebook") extend (Compile, Runtime)
 
   object autoImport {
-    val jupyterSparkVersion = settingKey[Option[String]]("Spark version for the Jupyter kernel")
+    val jupyterSparkBinaryVersion = settingKey[Option[String]]("Spark binary version for the Jupyter kernel")
     val jupyterJoveVersion = settingKey[Option[String]]("Jove version for the Jupyter kernel")
     val jupyterKernelId = taskKey[String]("Jupyter kernel id")
     val jupyterKernelName = taskKey[String]("Jupyter kernel name")
@@ -42,9 +42,8 @@ object NotebookPlugin extends AutoPlugin {
       libraryDependencies += {
         val joveVersion = jupyterJoveVersion.value getOrElse "0.1.1-1-SNAPSHOT"
 
-        (jupyterSparkVersion in Runtime).value match {
-          case Some(sv) =>
-            val binaryVersion = sv split '.' take 2 mkString "."
+        (jupyterSparkBinaryVersion in Runtime).value match {
+          case Some(binaryVersion) =>
             "sh.jove" %% s"jove-spark-embedded-cli_$binaryVersion" % joveVersion
           case None =>
             "sh.jove" %% "jove-scala-embedded-cli" % joveVersion
@@ -56,10 +55,10 @@ object NotebookPlugin extends AutoPlugin {
     )
   ) ++ Seq(
     /* Default config values */
-    jupyterSparkVersion := {
+    jupyterSparkBinaryVersion := {
       libraryDependencies.value
         .find(m => m.organization == "org.apache.spark" && m.name.startsWith("spark-core"))
-        .map(_.revision)
+        .map(_.revision split '.' take 2 mkString ".")
     },
     jupyterJoveVersion := None,
     jupyterKernelId := moduleName.value,
@@ -115,7 +114,7 @@ object NotebookPlugin extends AutoPlugin {
       val extraOpts = List("--exit-on-key-press", "--quiet", "--meta", "--id", jupyterKernelId.value, "--connection-file", jupyterJoveMetaConnectionFile.value.getAbsolutePath)
 
       val mainClass =
-        (jupyterSparkVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
+        (jupyterSparkBinaryVersion in Runtime).value.fold("jove.scala.JoveScalaEmbedded")(_ => "jove.spark.JoveSparkEmbedded")
 
       val (_, hook) = jupyterKernelSpecSetup.value
 
